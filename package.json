@@ -1,0 +1,29 @@
+{
+  "name": "fluentform-privacy",
+  "version": "1.0.0",
+  "description": "Registers Fluent Forms submissions with WordPress core privacy tools (Export/Erase Personal Data).",
+  "contributors": [
+    {
+      "name": "Sérgio Santos",
+      "homepage": "https://s3rgiosan.dev"
+    }
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/pixelalbatross/fluentform-privacy"
+  },
+  "license": "GPL-3.0-or-later",
+  "scripts": {
+    "wp-env": "wp-env",
+    "wp-env:clean": "wp-env clean all",
+    "test:setup": "npm run wp-env start",
+    "test:unit": "wp-env run tests-cli --env-cwd='wp-content/plugins/fluentform-privacy' vendor/bin/phpunit --testsuite=default"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=9.0.0"
+  },
+  "devDependencies": {
+    "@wordpress/env": "^10.39.0"
+  }
+}

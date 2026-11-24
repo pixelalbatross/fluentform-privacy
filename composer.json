@@ -1,0 +1,49 @@
+{
+  "name": "outstand/fluentform-privacy",
+  "description": "Adds Fluent Forms entries to the WordPress Export and Erase Personal Data tools, with consent records, entry retention and per-form data minimization.",
+  "type": "wordpress-plugin",
+  "license": "GPL-3.0-or-later",
+  "authors": [
+    {
+      "name": "Sérgio Santos",
+      "homepage": "https://s3rgiosan.dev"
+    }
+  ],
+  "autoload": {
+    "psr-4": {
+      "Outstand\\WP\\FluentForm\\Addons\\Privacy\\": "includes/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "Outstand\\WP\\FluentForm\\Addons\\Privacy\\Tests\\Unit\\": "tests/php/unit/"
+    }
+  },
+  "require": {
+    "php": "^8.2",
+    "composer-plugin-api": "^2.3",
+    "yahnis-elsts/plugin-update-checker": "^5.6"
+  },
+  "require-dev": {
+    "pixelalbatross/coding-standards": "dev-main",
+    "phpunit/phpunit": "^9.6",
+    "yoast/phpunit-polyfills": "^1.1",
+    "doctrine/instantiator": "~2.0.0"
+  },
+  "scripts": {
+    "lint": "phpcs .",
+    "lint-fix": "phpcbf .",
+    "test": "phpunit"
+  },
+  "extra": {
+    "installer-name": "fluentform-privacy"
+  },
+  "config": {
+    "sort-packages": true,
+    "allow-plugins": {
+      "composer/installers": true,
+      "dealerdirect/phpcodesniffer-composer-installer": true
+    },
+    "optimize-autoloader": true
+  }
+}
