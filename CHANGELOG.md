@@ -7,6 +7,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- `wp fluentform-privacy prune` prints "1 entry" and "3 entries" in its messages. Before, it printed the text `entr(y|ies)`.
+
 ## [1.1.0] - 2026-11-25
 
 ### Added

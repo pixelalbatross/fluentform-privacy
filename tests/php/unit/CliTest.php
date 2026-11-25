@@ -122,9 +122,8 @@ class CliTest extends WP_UnitTestCase {
 		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 		$this->assertSame( (string) $old, $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$submissions} WHERE id = %d", $old ) ) );
 
-		$successes = \WP_CLI::$successes;
-		$this->assertNotEmpty( $successes );
-		$this->assertStringContainsString( 'would be deleted', implode( ' ', $successes ) );
+		$this->assertSame( [ "Form {$form_id}: 1 to delete, 0 to anonymize, past 12 months" ], \WP_CLI::$logs );
+		$this->assertSame( [ '1 entry would be deleted and 0 entries anonymized. Re-run without --dry-run to apply.' ], \WP_CLI::$successes );
 	}
 
 	/**
@@ -148,14 +147,12 @@ class CliTest extends WP_UnitTestCase {
 		$form_id = $this->seed_form();
 		$old     = $this->seed_submission( $form_id, gmdate( 'Y-m-d H:i:s', strtotime( '-18 months' ) ) );
 
-		( new Cli() )->prune( [], [ 'months' => '12' ] );
+		( new Cli() )->prune( [], [ 'months' => '1' ] );
 
 		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 		$this->assertNull( $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$submissions} WHERE id = %d", $old ) ) );
 
-		$successes = \WP_CLI::$successes;
-		$last      = end( $successes );
-		$this->assertStringContainsString( 'Deleted', $last );
+		$this->assertSame( [ 'Deleted 1 entry and anonymized 0 entries older than 1 month.' ], \WP_CLI::$successes );
 	}
 
 	/**

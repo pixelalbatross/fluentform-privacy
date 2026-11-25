@@ -75,14 +75,28 @@ class Cli extends BaseModule {
 		$anonymized = array_sum( array_column( $counts, 'anonymized' ) );
 
 		foreach ( $counts as $form_id => $count ) {
-			\WP_CLI::log( sprintf( 'Form %d: %d to delete, %d to anonymize, past %d months', $form_id, $count['deleted'], $count['anonymized'], $months ) );
+			\WP_CLI::log( sprintf( 'Form %d: %d to delete, %d to anonymize, past %s', $form_id, $count['deleted'], $count['anonymized'], $this->count_label( $months, 'month', 'months' ) ) );
 		}
 
 		if ( $dry_run ) {
-			\WP_CLI::success( sprintf( '%d entr(y|ies) would be deleted and %d anonymized. Re-run without --dry-run to apply.', $deleted, $anonymized ) );
+			\WP_CLI::success( sprintf( '%s would be deleted and %s anonymized. Re-run without --dry-run to apply.', $this->count_label( $deleted, 'entry', 'entries' ), $this->count_label( $anonymized, 'entry', 'entries' ) ) );
 			return;
 		}
 
-		\WP_CLI::success( sprintf( 'Deleted %d and anonymized %d entr(y|ies) older than %d months.', $deleted, $anonymized, $months ) );
+		\WP_CLI::success( sprintf( 'Deleted %s and anonymized %s older than %s.', $this->count_label( $deleted, 'entry', 'entries' ), $this->count_label( $anonymized, 'entry', 'entries' ), $this->count_label( $months, 'month', 'months' ) ) );
+	}
+
+	/**
+	 * A count followed by the singular or plural noun, such as "1 entry" or "3 entries".
+	 *
+	 * @param  int    $count    The count.
+	 * @param  string $singular The noun for a count of 1.
+	 * @param  string $plural   The noun for any other count.
+	 * @return string
+	 */
+	private function count_label( int $count, string $singular, string $plural ): string {
+		$noun = 1 === $count ? $singular : $plural;
+
+		return sprintf( '%d %s', $count, $noun );
 	}
 }
