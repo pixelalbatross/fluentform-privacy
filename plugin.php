@@ -6,7 +6,7 @@
  * Plugin URI:        https://outstand.site/?utm_source=wp-plugins&utm_medium=fluentform-privacy&utm_campaign=plugin-uri
  * Requires at least: 6.7
  * Requires PHP:      8.2
- * Version:           1.1.0
+ * Version:           1.1.1
  * Author:            Outstand
  * Author URI:        https://outstand.site/?utm_source=wp-plugins&utm_medium=fluentform-privacy&utm_campaign=author-uri
  * License:           GPL-3.0-or-later
@@ -29,7 +29,7 @@ if ( ! defined( 'WPINC' ) ) {
 	die;
 }
 
-$plugin_version = '1.1.0';
+$plugin_version = '1.1.1';
 if ( file_exists( __DIR__ . '/.commit' ) ) {
 	$plugin_version .= '-' . trim( (string) file_get_contents( __DIR__ . '/.commit' ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
 }

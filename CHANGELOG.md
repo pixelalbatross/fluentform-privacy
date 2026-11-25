@@ -7,6 +7,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-11-25
+
 ### Fixed
 
 - `wp fluentform-privacy prune` prints "1 entry" and "3 entries" in its messages. Before, it printed the text `entr(y|ies)`.
@@ -42,6 +44,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Data minimization applies to the forms a site selects with `outstand_fluentform_privacy_minimal_data`. These forms store no IP address, country, browser or device with the entry, and uploaded JPEG and PNG photos are saved again without their metadata.
 - The filters `outstand_fluentform_privacy_group_label`, `outstand_fluentform_privacy_retention_months` and `outstand_fluentform_privacy_minimal_data` let a site change the export group label, the retention window and the minimal-data forms.
 
-[Unreleased]: https://github.com/pixelalbatross/fluentform-privacy/compare/1.1.0...HEAD
+[Unreleased]: https://github.com/pixelalbatross/fluentform-privacy/compare/1.1.1...HEAD
+[1.1.1]: https://github.com/pixelalbatross/fluentform-privacy/compare/1.1.0...1.1.1
 [1.1.0]: https://github.com/pixelalbatross/fluentform-privacy/compare/1.0.0...1.1.0
 [1.0.0]: https://github.com/pixelalbatross/fluentform-privacy/releases/tag/1.0.0
