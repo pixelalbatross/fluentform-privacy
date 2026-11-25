@@ -26,6 +26,7 @@ class ComposerStaticInite6da27ee2d2ff43db58d1d0366a49547
 
     public static $classMap = array (
         'Composer\\InstalledVersions' => __DIR__ . '/..' . '/composer/InstalledVersions.php',
+        'Outstand\\WP\\FluentForm\\Addons\\Privacy\\Anonymizer' => __DIR__ . '/../..' . '/includes/Anonymizer.php',
         'Outstand\\WP\\FluentForm\\Addons\\Privacy\\BaseModule' => __DIR__ . '/../..' . '/includes/BaseModule.php',
         'Outstand\\WP\\FluentForm\\Addons\\Privacy\\Cli' => __DIR__ . '/../..' . '/includes/Cli.php',
         'Outstand\\WP\\FluentForm\\Addons\\Privacy\\Consent' => __DIR__ . '/../..' . '/includes/Consent.php',

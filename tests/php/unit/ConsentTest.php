@@ -246,15 +246,90 @@ class ConsentTest extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Hooks capture() onto submission_inserted at priority 20.
+	 * Hooks capture() onto before_form_actions_processing at priority 5, before admin approval and
+	 * double opt-in hold the entry at priority 10.
 	 *
 	 * @return void
 	 */
-	public function test_register_hooks_capture_at_priority_20(): void {
+	public function test_register_hooks_capture_before_entries_are_held(): void {
 		$consent = new Consent();
 		$consent->register();
 
-		$this->assertSame( 20, has_action( 'fluentform/submission_inserted', [ $consent, 'capture' ] ) );
+		$this->assertSame( 5, has_action( 'fluentform/before_form_actions_processing', [ $consent, 'capture' ] ) );
+		$this->assertFalse( has_action( 'fluentform/submission_inserted', [ $consent, 'capture' ] ) );
+
+		remove_action( 'fluentform/before_form_actions_processing', [ $consent, 'capture' ], 5 );
+	}
+
+	/**
+	 * A second run for the same entry, as when a held entry is approved, keeps the first snapshot.
+	 *
+	 * @return void
+	 */
+	public function test_capture_keeps_the_first_snapshot(): void {
+		global $wpdb;
+
+		$meta_table = $wpdb->prefix . 'fluentform_submission_meta';
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		if ( $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $meta_table ) ) !== $meta_table ) {
+			$this->markTestSkipped( 'Fluent Forms tables are not present.' );
+		}
+
+		$form = static fn ( string $label ) => (object) [
+			'id'          => 8,
+			'form_fields' => (string) wp_json_encode(
+				[
+					'fields' => [
+						[
+							'element'    => 'gdpr_agreement',
+							'attributes' => [ 'name' => 'consent' ],
+							'settings'   => [ 'label' => $label ],
+						],
+					],
+				]
+			),
+		];
+
+		$entry_id = 987658;
+		( new Consent() )->capture( $entry_id, [ 'consent' => 'on' ], $form( 'Wording at submission.' ) );
+		( new Consent() )->capture( $entry_id, [ 'consent' => 'on' ], $form( 'Wording at approval.' ) );
+
+		$this->assertSame(
+			[
+				[
+					'text'     => 'Wording at submission.',
+					'accepted' => true,
+				],
+			],
+			$this->read_consent( $entry_id )
+		);
+
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$rows = $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$meta_table} WHERE response_id = %d", $entry_id ) );
+		$this->assertSame( '2', $rows );
+	}
+
+	/**
+	 * A hook call without an entry id stores nothing and does not fail.
+	 *
+	 * @return void
+	 */
+	public function test_capture_ignores_a_missing_entry_id(): void {
+		global $wpdb;
+
+		$meta_table = $wpdb->prefix . 'fluentform_submission_meta';
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		if ( $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $meta_table ) ) !== $meta_table ) {
+			$this->markTestSkipped( 'Fluent Forms tables are not present.' );
+		}
+
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$before = $wpdb->get_var( "SELECT COUNT(*) FROM {$meta_table}" );
+
+		( new Consent() )->capture( null, null, (object) [ 'id' => 9 ] );
+
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$this->assertSame( $before, $wpdb->get_var( "SELECT COUNT(*) FROM {$meta_table}" ) );
 	}
 
 	/**

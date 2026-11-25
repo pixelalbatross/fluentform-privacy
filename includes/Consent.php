@@ -39,9 +39,13 @@ class Consent extends BaseModule {
 
 	/**
 	 * Hooks consent capture onto every submission.
+	 *
+	 * `fluentform/before_form_actions_processing` runs in the visitor's own request, before admin
+	 * approval and double opt-in hold the entry at priority 10. Fluent Forms runs it again when a held
+	 * entry is approved or confirmed; capture() then keeps the first snapshot.
 	 */
 	public function register(): void {
-		add_action( 'fluentform/submission_inserted', [ $this, 'capture' ], 20, 3 );
+		add_action( 'fluentform/before_form_actions_processing', [ $this, 'capture' ], 5, 3 );
 	}
 
 	/**
@@ -49,12 +53,21 @@ class Consent extends BaseModule {
 	 * onto the entry. Storing the accepted state — read from the submitted value — is what makes the
 	 * snapshot proof of consent rather than proof the field merely existed.
 	 *
-	 * @param  int       $entry_id  The new submission id.
-	 * @param  array     $form_data The submitted data, keyed by field name.
-	 * @param  \stdClass $form      The form object.
+	 * Fluent Forms passes the hook arguments unchecked, so they are validated here.
+	 *
+	 * @param  int|mixed   $entry_id  The new submission id.
+	 * @param  array|mixed $form_data The submitted data, keyed by field name.
+	 * @param  \stdClass   $form      The form object.
 	 * @return void
 	 */
-	public function capture( int $entry_id, array $form_data, $form ): void {
+	public function capture( $entry_id, $form_data, $form ): void {
+		$entry_id  = (int) $entry_id;
+		$form_data = is_array( $form_data ) ? $form_data : [];
+
+		if ( $entry_id <= 0 || $this->has_snapshot( $entry_id ) ) {
+			return;
+		}
+
 		$form_id        = (int) ( $form->id ?? 0 );
 		$consent_fields = self::extract_consent_fields( (string) ( $form->form_fields ?? '' ) );
 
@@ -184,6 +197,24 @@ class Consent extends BaseModule {
 				}
 			}
 		}
+	}
+
+	/**
+	 * Whether the entry already has a snapshot. Every snapshot stores the language, so that row marks
+	 * one.
+	 *
+	 * @param  int $entry_id The submission id.
+	 * @return bool
+	 */
+	private function has_snapshot( int $entry_id ): bool {
+		global $wpdb;
+
+		$table = $wpdb->prefix . 'fluentform_submission_meta';
+
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$found = $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$table} WHERE response_id = %d AND meta_key = %s LIMIT 1", $entry_id, self::META_LANGUAGE ) );
+
+		return null !== $found;
 	}
 
 	/**

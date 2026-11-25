@@ -7,13 +7,14 @@ defined( 'ABSPATH' ) || exit;
 use FluentForm\App\Services\Submission\SubmissionService;
 
 /**
- * Deletes Fluent Forms entries past a retention window.
+ * Deletes Fluent Forms entries past a retention window, and anonymizes the paid ones.
  *
  * Retention is **off by default** — a plugin that silently deletes personal data the moment it is
  * installed would be a footgun. A site opts in by returning a positive number of months from the
  * `outstand_fluentform_privacy_retention_months` filter (or by passing `--months` to the CLI command).
  * When a window is configured, a daily WP-Cron event enforces it automatically; the CLI command remains
  * for on-demand runs. Deletion goes through Fluent Forms' own `SubmissionService::deleteEntries()` cascade.
+ * An entry with a kept payment status goes through Anonymizer, so its payment record stays.
  */
 class Retention extends BaseModule {
 
@@ -115,42 +116,60 @@ class Retention extends BaseModule {
 	}
 
 	/**
-	 * Deletes every submission older than the window, grouped by form.
+	 * Handles every submission older than the window, grouped by form. An entry with a kept payment
+	 * status is anonymized and keeps its payment record; every other entry is deleted.
 	 *
 	 * @param  int  $months  Retention window in months.
-	 * @param  bool $dry_run When true, counts without deleting.
-	 * @return array<int,int> Deleted (or, on a dry run, deletable) count keyed by form id.
+	 * @param  bool $dry_run When true, counts without changing anything.
+	 * @return array<int,array{deleted:int,anonymized:int}> Counts keyed by form id. On a dry run, the
+	 *                                                     entries that would be deleted or anonymized.
 	 */
 	public function prune( int $months, bool $dry_run ): array {
 		global $wpdb;
 
 		$cutoff = self::cutoff( $months );
 		$table  = $wpdb->prefix . 'fluentform_submissions';
+		$meta   = $wpdb->prefix . 'fluentform_submission_meta';
 
 		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-		$rows = $wpdb->get_results( $wpdb->prepare( "SELECT id, form_id FROM {$table} WHERE created_at < %s", $cutoff ) );
+		$rows = $wpdb->get_results( $wpdb->prepare( "SELECT id, form_id FROM {$table} WHERE created_at < %s AND id NOT IN (SELECT response_id FROM {$meta} WHERE meta_key = %s)", $cutoff, Anonymizer::META_ANONYMIZED ) );
 
 		$by_form = [];
 		foreach ( (array) $rows as $row ) {
 			$by_form[ (int) $row->form_id ][] = (int) $row->id;
 		}
 
-		$counts = [];
+		$anonymizer = new Anonymizer();
+		$counts     = [];
+
 		foreach ( $by_form as $form_id => $ids ) {
+			$kept      = $anonymizer->kept_ids( $ids );
+			$deletable = array_values( array_diff( $ids, $kept ) );
+
 			if ( $dry_run ) {
-				$counts[ $form_id ] = count( $ids );
+				$counts[ $form_id ] = [
+					'deleted'    => count( $deletable ),
+					'anonymized' => count( $kept ),
+				];
 				continue;
 			}
 
-			try {
-				( new SubmissionService() )->deleteEntries( $ids, $form_id );
-			} catch ( \Throwable $e ) {
-				// One form failing must not abort the whole prune; the next scheduled run retries. The
-				// count below reads live DB state, so a failed group reports 0 deleted.
-				unset( $e );
+			$anonymized = $anonymizer->anonymize( $kept, $form_id );
+
+			if ( ! empty( $deletable ) ) {
+				try {
+					( new SubmissionService() )->deleteEntries( $deletable, $form_id );
+				} catch ( \Throwable $e ) {
+					// One form failing must not abort the whole prune; the next scheduled run retries. The
+					// count below reads live DB state, so a failed group reports 0 deleted.
+					unset( $e );
+				}
 			}
 
-			$counts[ $form_id ] = count( $ids ) - $this->still_present( $ids );
+			$counts[ $form_id ] = [
+				'deleted'    => count( $deletable ) - $this->still_present( $deletable ),
+				'anonymized' => $anonymized,
+			];
 		}
 
 		return $counts;

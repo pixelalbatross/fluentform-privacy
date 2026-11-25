@@ -58,6 +58,39 @@ class CliTest extends WP_UnitTestCase {
 	}
 
 	/**
+	 * A --months value below 1 or not a whole number is refused, so it never runs a shorter window.
+	 *
+	 * @dataProvider invalid_months
+	 *
+	 * @param  string $months The --months value.
+	 * @return void
+	 */
+	public function test_prune_refuses_invalid_months( string $months ): void {
+		if ( ! class_exists( \FluentForm\App\Services\Submission\SubmissionService::class ) ) {
+			$this->markTestSkipped( 'Fluent Forms is not active.' );
+		}
+
+		$this->expectException( \RuntimeException::class );
+		$this->expectExceptionMessage( '--months must be a whole number of 1 or more.' );
+
+		( new Cli() )->prune( [], [ 'months' => $months ] );
+	}
+
+	/**
+	 * The --months values that prune() refuses.
+	 *
+	 * @return array<string,array{string}>
+	 */
+	public static function invalid_months(): array {
+		return [
+			'zero'     => [ '0' ],
+			'negative' => [ '-3' ],
+			'text'     => [ 'abc' ],
+			'decimal'  => [ '1.5' ],
+		];
+	}
+
+	/**
 	 * A dry run reports what would be deleted without deleting it.
 	 *
 	 * @return void

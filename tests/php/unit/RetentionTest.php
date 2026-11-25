@@ -82,7 +82,7 @@ class RetentionTest extends WP_UnitTestCase {
 
 		$counts = ( new Retention() )->prune( 12, false );
 
-		$this->assertSame( 1, array_sum( $counts ) );
+		$this->assertSame( 1, array_sum( array_column( $counts, 'deleted' ) ) );
 
 		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 		$this->assertNull( $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$submissions} WHERE id = %d", $old ) ) );
@@ -127,7 +127,7 @@ class RetentionTest extends WP_UnitTestCase {
 
 		$counts = ( new Retention() )->prune( 12, true );
 
-		$this->assertSame( 1, array_sum( $counts ) );
+		$this->assertSame( 1, array_sum( array_column( $counts, 'deleted' ) ) );
 
 		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 		$this->assertSame( (string) $old, $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$submissions} WHERE id = %d", $old ) ) );
@@ -159,8 +159,8 @@ class RetentionTest extends WP_UnitTestCase {
 		$counts = ( new Retention() )->prune( 12, false );
 
 		$this->assertCount( 2, $counts );
-		$this->assertSame( 1, $counts[ $form_a ] );
-		$this->assertSame( 1, $counts[ $form_b ] );
+		$this->assertSame( 1, $counts[ $form_a ]['deleted'] );
+		$this->assertSame( 1, $counts[ $form_b ]['deleted'] );
 	}
 
 	/**

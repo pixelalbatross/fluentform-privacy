@@ -2,6 +2,7 @@
 
 namespace Outstand\WP\FluentForm\Addons\Privacy\Tests\Unit;
 
+use Outstand\WP\FluentForm\Addons\Privacy\Consent;
 use Outstand\WP\FluentForm\Addons\Privacy\Privacy;
 use WP_UnitTestCase;
 
@@ -151,6 +152,9 @@ class PrivacyTest extends WP_UnitTestCase {
 		$second = $this->privacy->export_by_email( $email, 2 );
 		$this->assertCount( 1, $second['data'] );
 		$this->assertTrue( $second['done'] );
+
+		$item_ids = wp_list_pluck( array_merge( $first['data'], $second['data'] ), 'item_id' );
+		$this->assertCount( 101, array_unique( $item_ids ) );
 	}
 
 	/**
@@ -192,8 +196,8 @@ class PrivacyTest extends WP_UnitTestCase {
 	}
 
 	/**
-	 * An email embedded in a JSON array field value (e.g. a checkbox/repeater field) is matched via the
-	 * quoted-substring LIKE, and is both exported and erased.
+	 * An email inside a JSON array field value (e.g. a checkbox/repeater field) is matched as a quoted
+	 * JSON string, and is both exported and erased.
 	 *
 	 * @return void
 	 */
@@ -234,6 +238,126 @@ class PrivacyTest extends WP_UnitTestCase {
 
 		$erase = $this->privacy->erase_by_email( 'nested@example.test' );
 		$this->assertSame( 1, $erase['items_removed'] );
+	}
+
+	/**
+	 * An entry that admin approval or double opt-in holds has a response but no entry detail rows
+	 * yet. It is still exported and erased.
+	 *
+	 * @return void
+	 */
+	public function test_matches_a_held_entry_without_detail_rows(): void {
+		$submission_id = $this->insert_submission( [ 'response' => (string) wp_json_encode( [ 'email' => 'held@example.test' ] ) ] );
+
+		$export = $this->privacy->export_by_email( 'held@example.test' );
+		$this->assertCount( 1, $export['data'] );
+		$this->assertSame( 'entry-' . $submission_id, $export['data'][0]['item_id'] );
+
+		$erase = $this->privacy->erase_by_email( 'held@example.test' );
+		$this->assertSame( 1, $erase['items_removed'] );
+	}
+
+	/**
+	 * An entry that a WordPress user submitted matches that user's email, even when no field holds it.
+	 *
+	 * @return void
+	 */
+	public function test_matches_entries_by_the_submitting_user(): void {
+		$user_id = self::factory()->user->create( [ 'user_email' => 'member@example.test' ] );
+
+		$submission_id = $this->insert_submission(
+			[
+				'response' => (string) wp_json_encode( [ 'message' => 'Hello' ] ),
+				'user_id'  => $user_id,
+			]
+		);
+
+		$export = $this->privacy->export_by_email( 'member@example.test' );
+		$this->assertCount( 1, $export['data'] );
+		$this->assertSame( 'entry-' . $submission_id, $export['data'][0]['item_id'] );
+	}
+
+	/**
+	 * An address is matched only as a whole JSON string, never as part of a longer address.
+	 *
+	 * @return void
+	 */
+	public function test_does_not_match_a_longer_address(): void {
+		$this->insert_submission( [ 'response' => (string) wp_json_encode( [ 'email' => 'ann@example.test.org' ] ) ] );
+
+		$export = $this->privacy->export_by_email( 'ann@example.test' );
+		$this->assertCount( 0, $export['data'] );
+	}
+
+	/**
+	 * The export holds the entry columns, every field and sub-field, and the consent record, and
+	 * leaves out the fields Fluent Forms adds for its own use.
+	 *
+	 * @return void
+	 */
+	public function test_export_holds_columns_sub_fields_and_consent(): void {
+		global $wpdb;
+
+		$form_id       = $this->ensure_form();
+		$submission_id = $this->insert_submission(
+			[
+				'form_id'        => $form_id,
+				'response'       => (string) wp_json_encode(
+					[
+						'email'            => 'full@example.test',
+						'names'            => [
+							'first_name' => 'Ada',
+							'last_name'  => 'Example',
+						],
+						'address'          => [ 'city' => 'Sampletown' ],
+						'empty_field'      => '',
+						'_wp_http_referer' => '/contact/',
+					]
+				),
+				'ip'             => '192.0.2.10',
+				'browser'        => 'Firefox',
+				'payment_status' => 'paid',
+				'payment_total'  => 1250,
+				'currency'       => 'EUR',
+			]
+		);
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$wpdb->insert(
+			$wpdb->prefix . 'fluentform_submission_meta',
+			[
+				'response_id' => $submission_id,
+				'form_id'     => $form_id,
+				'meta_key'    => Consent::META_CONSENT,
+				'value'       => (string) wp_json_encode(
+					[
+						[
+							'text'     => 'I agree.',
+							'accepted' => true,
+						],
+					]
+				),
+			]
+		);
+
+		$export = $this->privacy->export_by_email( 'full@example.test' );
+		$this->assertCount( 1, $export['data'] );
+
+		$data = array_column( $export['data'][0]['data'], 'value', 'name' );
+
+		$this->assertSame( 'full@example.test', $data['email'] );
+		$this->assertSame( 'Ada', $data['names[first_name]'] );
+		$this->assertSame( 'Example', $data['names[last_name]'] );
+		$this->assertSame( 'Sampletown', $data['address[city]'] );
+		$this->assertSame( '192.0.2.10', $data['IP address'] );
+		$this->assertSame( 'Firefox', $data['Browser'] );
+		$this->assertSame( 'paid', $data['Payment status'] );
+		$this->assertSame( '12.50', $data['Payment total'] );
+		$this->assertSame( 'EUR', $data['Currency'] );
+		$this->assertSame( 'I agree.', $data['Consent given'] );
+		$this->assertArrayNotHasKey( 'empty_field', $data );
+		$this->assertArrayNotHasKey( '_wp_http_referer', $data );
+		$this->assertArrayNotHasKey( 'Device', $data );
 	}
 
 	/**
@@ -299,6 +423,31 @@ class PrivacyTest extends WP_UnitTestCase {
 		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 
 		return $submission_id;
+	}
+
+	/**
+	 * Inserts one Fluent Forms submission row, with no entry detail rows, and returns its id.
+	 *
+	 * @param  array<string,mixed> $columns Column values; form_id defaults to a new form.
+	 * @return int Submission id.
+	 */
+	private function insert_submission( array $columns ): int {
+		global $wpdb;
+
+		$columns = array_merge(
+			[
+				'form_id'    => $columns['form_id'] ?? $this->ensure_form(),
+				'status'     => 'unread',
+				'created_at' => current_time( 'mysql' ),
+				'updated_at' => current_time( 'mysql' ),
+			],
+			$columns
+		);
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$wpdb->insert( $wpdb->prefix . 'fluentform_submissions', $columns );
+
+		return (int) $wpdb->insert_id;
 	}
 
 	/**

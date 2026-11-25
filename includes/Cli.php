@@ -26,7 +26,7 @@ class Cli extends BaseModule {
 	}
 
 	/**
-	 * Deletes Fluent Forms entries older than the retention window.
+	 * Deletes Fluent Forms entries older than the retention window, and anonymizes the paid ones.
 	 *
 	 * Retention is off unless a window is configured via the `outstand_fluentform_privacy_retention_months`
 	 * filter, or passed here with `--months`. Run through the host's cron for reliable scheduling.
@@ -54,25 +54,35 @@ class Cli extends BaseModule {
 			\WP_CLI::error( 'Fluent Forms is not active; there are no entries to prune.' );
 		}
 
-		$months = isset( $assoc_args['months'] ) ? max( 1, (int) $assoc_args['months'] ) : Retention::months();
+		$months = Retention::months();
+
+		if ( isset( $assoc_args['months'] ) ) {
+			$given  = trim( (string) $assoc_args['months'] );
+			$months = (int) $given;
+
+			if ( $months < 1 || (string) $months !== $given ) {
+				\WP_CLI::error( '--months must be a whole number of 1 or more.' );
+			}
+		}
 
 		if ( $months <= 0 ) {
 			\WP_CLI::error( 'Retention is disabled. Set the outstand_fluentform_privacy_retention_months filter or pass --months.' );
 		}
 
-		$dry_run = (bool) ( $assoc_args['dry-run'] ?? false );
-		$counts  = ( new Retention() )->prune( $months, $dry_run );
-		$total   = array_sum( $counts );
+		$dry_run    = (bool) ( $assoc_args['dry-run'] ?? false );
+		$counts     = ( new Retention() )->prune( $months, $dry_run );
+		$deleted    = array_sum( array_column( $counts, 'deleted' ) );
+		$anonymized = array_sum( array_column( $counts, 'anonymized' ) );
 
 		foreach ( $counts as $form_id => $count ) {
-			\WP_CLI::log( sprintf( 'Form %d: %d past %d months', $form_id, $count, $months ) );
+			\WP_CLI::log( sprintf( 'Form %d: %d to delete, %d to anonymize, past %d months', $form_id, $count['deleted'], $count['anonymized'], $months ) );
 		}
 
 		if ( $dry_run ) {
-			\WP_CLI::success( sprintf( '%d entr(y|ies) would be deleted. Re-run without --dry-run to delete.', $total ) );
+			\WP_CLI::success( sprintf( '%d entr(y|ies) would be deleted and %d anonymized. Re-run without --dry-run to apply.', $deleted, $anonymized ) );
 			return;
 		}
 
-		\WP_CLI::success( sprintf( 'Deleted %d entr(y|ies) older than %d months.', $total, $months ) );
+		\WP_CLI::success( sprintf( 'Deleted %d and anonymized %d entr(y|ies) older than %d months.', $deleted, $anonymized, $months ) );
 	}
 }

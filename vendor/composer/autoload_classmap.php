@@ -7,6 +7,7 @@ $baseDir = dirname($vendorDir);
 
 return array(
     'Composer\\InstalledVersions' => $vendorDir . '/composer/InstalledVersions.php',
+    'Outstand\\WP\\FluentForm\\Addons\\Privacy\\Anonymizer' => $baseDir . '/includes/Anonymizer.php',
     'Outstand\\WP\\FluentForm\\Addons\\Privacy\\BaseModule' => $baseDir . '/includes/BaseModule.php',
     'Outstand\\WP\\FluentForm\\Addons\\Privacy\\Cli' => $baseDir . '/includes/Cli.php',
     'Outstand\\WP\\FluentForm\\Addons\\Privacy\\Consent' => $baseDir . '/includes/Consent.php',
